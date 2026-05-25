@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Synapse — AI Study Partner</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">⚡</span>
+      <h1>Synapse</h1>
+      <span class="tagline">Virtual AI Study Partner</span>
+    </div>
+    <button id="clearBtn" class="btn btn-ghost" title="Clear this session">
+      Clear Session
+    </button>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="study">📘 Study</button>
+    <button class="tab" data-tab="quiz">🧠 Quiz</button>
+  </nav>
+
+  <main>
+    <!-- STUDY TAB -->
+    <section id="tab-study" class="tab-panel active">
+      <div class="controls">
+        <label for="studySubject">Subject</label>
+        <select id="studySubject">
+          <option>Biology</option>
+          <option>Chemistry</option>
+          <option>Physics</option>
+          <option>Mathematics</option>
+          <option>History</option>
+          <option>Literature</option>
+          <option>Python</option>
+          <option>JavaScript</option>
+          <option>Computer Science</option>
+          <option>Economics</option>
+        </select>
+      </div>
+
+      <div id="chatWindow" class="chat-window" aria-live="polite"></div>
+
+      <form id="chatForm" class="chat-input">
+        <input
+          id="chatInput"
+          type="text"
+          placeholder="Ask Synapse anything about your subject…"
+          autocomplete="off"
+          required
+        />
+        <button type="submit" class="btn btn-primary" id="sendBtn">Send</button>
+      </form>
+    </section>
+
+    <!-- QUIZ TAB -->
+    <section id="tab-quiz" class="tab-panel">
+      <div class="controls quiz-controls">
+        <div>
+          <label for="quizSubject">Subject</label>
+          <select id="quizSubject">
+            <option>Biology</option>
+            <option>Chemistry</option>
+            <option>Physics</option>
+            <option>Mathematics</option>
+            <option>History</option>
+            <option>Literature</option>
+            <option>Python</option>
+            <option>JavaScript</option>
+            <option>Computer Science</option>
+            <option>Economics</option>
+          </select>
+        </div>
+        <div>
+          <label for="quizDifficulty">Difficulty</label>
+          <select id="quizDifficulty">
+            <option>Easy</option>
+            <option selected>Medium</option>
+            <option>Hard</option>
+          </select>
+        </div>
+        <button id="generateBtn" class="btn btn-primary">Generate Quiz</button>
+      </div>
+
+      <div id="quizArea" class="quiz-area"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>Session: <code id="sessionLabel">—</code></span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
