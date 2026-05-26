@@ -378,6 +378,52 @@ Pydantic validation errors return 422 automatically.
 
 ---
 
+## Deploy to Vercel
+
+1. **MongoDB Atlas is required** (no local mongod from Vercel). Follow
+   [Atlas setup](#mongodb-atlas-setup) above. In Network Access, allow
+   `0.0.0.0/0` — Vercel function IPs rotate.
+2. Sign in at <https://vercel.com> with GitHub and grant access to this repo.
+3. <https://vercel.com/new> → import `rhon-dev/Synapse`.
+4. Framework Preset: **Other**. Leave build/output settings empty
+   (`vercel.json` declares everything).
+5. **Environment Variables** — add the same vars you have in `backend/.env`,
+   minus comments:
+
+   - `OPENAI_API_KEY`
+   - `OPENAI_BASE_URL` (e.g. `https://api.groq.com/openai/v1`)
+   - `OPENAI_MODEL` (e.g. `llama-3.3-70b-versatile`)
+   - `MONGO_URI` (Atlas `mongodb+srv://...` string)
+   - `DB_NAME` = `synapse`
+   - Optional: `ATLAS_API_PUBLIC_KEY`, `ATLAS_API_PRIVATE_KEY`,
+     `ATLAS_PROJECT_ID`
+
+6. **Deploy**. Build takes ~1–2 min. You get a URL like
+   `https://synapse-<hash>.vercel.app`.
+
+### How the deploy is wired
+
+| File              | Role                                                       |
+|-------------------|------------------------------------------------------------|
+| `vercel.json`     | Two builders: `@vercel/python` for `api/index.py`, `@vercel/static` for `frontend/**`. Routes: `/static/*` → static files, `/` → `frontend/index.html`, everything else → FastAPI function. |
+| `api/index.py`    | Re-exports the FastAPI app so Vercel's Python builder finds an ASGI callable. |
+
+### Trade-offs vs local
+
+- **Cold starts** (~2–5 s) after idle — first request rebuilds the Python
+  runtime and Mongo client pool.
+- **10-second function timeout** on the Hobby (free) plan — fine for chat,
+  occasionally tight for slow quiz generations.
+- **No persistent connections** — Motor's pool is rebuilt per cold start.
+- Locally, FastAPI serves the static frontend via `StaticFiles`. On Vercel
+  the frontend is served from Vercel's CDN; the FastAPI mount is shadowed
+  but harmless.
+
+For a closer match to local behaviour (long-running FastAPI, no cold
+starts mid-session), consider **Render**, **Railway**, or **Fly.io**.
+
+---
+
 ## License
 
 MIT — do whatever you want with it.
