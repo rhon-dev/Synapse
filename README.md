@@ -28,7 +28,7 @@ history survives reloads.
 | Layer          | Tech                                             |
 |----------------|--------------------------------------------------|
 | Backend        | Python 3.10+, FastAPI, async                     |
-| AI             | OpenAI API (GPT-4o), JSON mode for quizzes       |
+| AI             | Any OpenAI-API-compatible LLM (OpenAI, Groq, Gemini, Ollama, OpenRouter) — JSON mode for quizzes |
 | Database       | MongoDB (local or Atlas) via **Motor** (async)   |
 | Validation     | Pydantic v2                                      |
 | Frontend       | Vanilla HTML / CSS / JS (single page)            |
@@ -78,10 +78,33 @@ cp backend/.env.example backend/.env
 Minimum required keys:
 
 ```env
-OPENAI_API_KEY=sk-your-real-key-here
-MONGO_URI=mongodb://localhost:27017       # or mongodb+srv://... for Atlas
+OPENAI_API_KEY=<your-llm-provider-key>
+OPENAI_BASE_URL=<provider-base-url>      # leave blank for OpenAI itself
+OPENAI_MODEL=<model-name>
+MONGO_URI=mongodb://localhost:27017      # or mongodb+srv://... for Atlas
 DB_NAME=synapse
 ```
+
+#### LLM provider options
+
+Synapse uses the OpenAI Python SDK, which is compatible with multiple
+providers. Pick whichever you have access to:
+
+| Provider     | Free? | `OPENAI_BASE_URL`                                            | Example model              |
+|--------------|-------|--------------------------------------------------------------|----------------------------|
+| **OpenAI**   | Paid  | *(leave empty — SDK default)*                                | `gpt-4o`                   |
+| **Groq**     | Free  | `https://api.groq.com/openai/v1`                             | `llama-3.3-70b-versatile`  |
+| **Gemini**   | Free  | `https://generativelanguage.googleapis.com/v1beta/openai/`   | `gemini-1.5-flash`         |
+| **Ollama**   | Free (local) | `http://localhost:11434/v1`                            | `llama3.2`                 |
+| **OpenRouter** | Free + paid mix | `https://openrouter.ai/api/v1`                     | `meta-llama/llama-3.3-70b-instruct:free` |
+
+Where to get keys:
+
+- OpenAI → <https://platform.openai.com/api-keys>  *(billing required)*
+- Groq → <https://console.groq.com/keys>  *(no credit card)*
+- Gemini → <https://aistudio.google.com/apikey>  *(no credit card)*
+- Ollama → no key — `brew install ollama && ollama pull llama3.2`
+- OpenRouter → <https://openrouter.ai/keys>
 
 > **Never** commit `.env` — it is in `.gitignore`. Always commit `.env.example`
 > with placeholders so contributors know which vars are required.

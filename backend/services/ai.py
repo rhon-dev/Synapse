@@ -19,7 +19,12 @@ _client: Optional[AsyncOpenAI] = None
 
 
 def get_client() -> AsyncOpenAI:
-    """Lazy-init singleton OpenAI async client."""
+    """Lazy-init singleton OpenAI-compatible async client.
+
+    Supports any OpenAI-API-compatible endpoint (Groq, Gemini OpenAI mode,
+    OpenRouter, local Ollama) via OPENAI_BASE_URL env var. When unset, hits
+    OpenAI directly.
+    """
     global _client
     if _client is None:
         api_key = os.getenv("OPENAI_API_KEY")
@@ -28,7 +33,11 @@ def get_client() -> AsyncOpenAI:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="OPENAI_API_KEY not configured on server.",
             )
-        _client = AsyncOpenAI(api_key=api_key, timeout=30.0, max_retries=1)
+        base_url = os.getenv("OPENAI_BASE_URL")
+        kwargs: dict = {"api_key": api_key, "timeout": 30.0, "max_retries": 1}
+        if base_url:
+            kwargs["base_url"] = base_url.rstrip("/")
+        _client = AsyncOpenAI(**kwargs)
     return _client
 
 
