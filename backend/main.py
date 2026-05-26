@@ -12,8 +12,10 @@ from fastapi.staticfiles import StaticFiles
 load_dotenv(Path(__file__).parent / ".env")
 
 from backend.db.mongo import close_mongo_connection, connect_to_mongo  # noqa: E402
+from backend.routes import atlas as atlas_routes  # noqa: E402
 from backend.routes import chat as chat_routes  # noqa: E402
 from backend.routes import sessions as session_routes  # noqa: E402
+from backend.services.atlas import close_atlas_client  # noqa: E402
 
 
 @asynccontextmanager
@@ -23,6 +25,7 @@ async def lifespan(_app: FastAPI):
         yield
     finally:
         await close_mongo_connection()
+        await close_atlas_client()
 
 
 app = FastAPI(
@@ -43,6 +46,7 @@ app.add_middleware(
 # API routes
 app.include_router(chat_routes.router, tags=["chat"])
 app.include_router(session_routes.router, tags=["sessions"])
+app.include_router(atlas_routes.router)
 
 
 @app.get("/healthz", tags=["health"])

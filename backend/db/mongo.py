@@ -14,8 +14,14 @@ async def connect_to_mongo() -> None:
     mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017")
     db_name = os.getenv("DB_NAME", "synapse")
 
+    # SRV (Atlas) handshake is slower than local TCP — give it more time
+    is_srv = mongo_uri.startswith("mongodb+srv://")
+    timeout_ms = 15000 if is_srv else 5000
+
     client: AsyncIOMotorClient = AsyncIOMotorClient(
-        mongo_uri, serverSelectionTimeoutMS=5000
+        mongo_uri,
+        serverSelectionTimeoutMS=timeout_ms,
+        appname="synapse",
     )
     db: AsyncIOMotorDatabase = client[db_name]
 

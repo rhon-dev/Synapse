@@ -53,32 +53,38 @@ source .venv/bin/activate           # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 3. Start MongoDB
+### 3. Choose a MongoDB backend
 
-Either run locally:
+**Option A — Local (fastest):**
 
 ```bash
-# macOS (Homebrew)
+brew install mongodb-community
 brew services start mongodb-community
 
 # or with Docker
 docker run -d --name synapse-mongo -p 27017:27017 mongo:7
 ```
 
-…or use a MongoDB Atlas connection string.
+**Option B — MongoDB Atlas (recommended for prod):** see
+[Atlas setup](#mongodb-atlas-setup) below.
 
 ### 4. Configure environment
 
-Edit `backend/.env`:
+```bash
+cp backend/.env.example backend/.env
+# then edit backend/.env with your real values
+```
+
+Minimum required keys:
 
 ```env
 OPENAI_API_KEY=sk-your-real-key-here
-MONGO_URI=mongodb://localhost:27017
+MONGO_URI=mongodb://localhost:27017       # or mongodb+srv://... for Atlas
 DB_NAME=synapse
-OPENAI_MODEL=gpt-4o
 ```
 
-> **Never** commit `.env` — it is already in `.gitignore`.
+> **Never** commit `.env` — it is in `.gitignore`. Always commit `.env.example`
+> with placeholders so contributors know which vars are required.
 
 ### 5. Run
 
@@ -197,7 +203,89 @@ Clear all events for a session. Returns `404` if no events exist.
 
 Liveness check: `{"status": "ok"}`.
 
+### Atlas Admin API endpoints (optional)
+
+Thin pass-through to [MongoDB Atlas Admin API v2](https://www.mongodb.com/docs/api/doc/atlas-admin-api-v2/).
+Require `ATLAS_API_PUBLIC_KEY`, `ATLAS_API_PRIVATE_KEY`, `ATLAS_PROJECT_ID` env
+vars. Return raw Atlas JSON.
+
+| Method | Path                              | Atlas operation             |
+|--------|-----------------------------------|-----------------------------|
+| GET    | `/atlas/projects`                 | `GET /groups`               |
+| GET    | `/atlas/project`                  | `GET /groups/{id}`          |
+| GET    | `/atlas/clusters`                 | `GET /groups/{id}/clusters` |
+| GET    | `/atlas/clusters/{name}`          | `GET /groups/{id}/clusters/{name}` |
+| GET    | `/atlas/database-users`           | `GET /groups/{id}/databaseUsers` |
+| GET    | `/atlas/network-access`           | `GET /groups/{id}/accessList` |
+| GET    | `/atlas/orgs/{org_id}`            | `GET /orgs/{orgId}`         |
+
 Interactive docs: <http://localhost:8000/docs>
+
+---
+
+## MongoDB Atlas Setup
+
+Two independent pieces of config — both are optional but recommended for
+production:
+
+### A. Atlas as your data store (`MONGO_URI`)
+
+1. Sign up: <https://www.mongodb.com/cloud/atlas/register>
+2. **Create a project** (any name).
+3. **Build a Database** → pick the **Free (M0)** tier in any region near you.
+4. While the cluster spins up (1–3 min), set two access things:
+   - **Database Access** → "Add New Database User" → username + password
+     (autogenerate, save it).
+   - **Network Access** → "Add IP Address" → either your current IP or
+     `0.0.0.0/0` for "allow anywhere" (fine for dev — restrict later).
+5. Once the cluster is "Active": click **Connect → Drivers**.
+6. Choose **Python**, version **3.12 or later**. Copy the SRV string. Looks
+   like `mongodb+srv://USER:<password>@cluster-xxx.xxxxx.mongodb.net/?retryWrites=true&w=majority`.
+7. Replace `<password>` with the password from step 4.
+8. Paste into `backend/.env`:
+
+   ```env
+   MONGO_URI=mongodb+srv://USER:REAL_PASSWORD@cluster-xxx.xxxxx.mongodb.net/?retryWrites=true&w=majority
+   ```
+
+9. Restart uvicorn. Motor auto-handles TLS + SRV resolution.
+
+### B. Atlas Admin API (`/atlas/*` endpoints)
+
+Only needed if you want the app to read/manage Atlas infrastructure (list
+clusters, users, etc.) at runtime.
+
+1. **Find your Project ID:** Atlas → Project → **Settings**. Copy the 24-char
+   hex ID (e.g. `5e3f1a2b9c4d3e1f0a1b2c3d`).
+2. **Create an API key:** Atlas → **Access Manager** (top-right org switcher
+   → Access Manager) → **API Keys** tab → **Create Organization API Key**.
+   - Description: `synapse-admin`
+   - Permission: `Organization Read Only` (or higher if you need writes).
+3. Atlas shows the **public key** (short) and **private key** (UUID-style).
+   Copy both. The private key is shown **once** — store it now.
+4. **Add the API key to your Project**: still in Access Manager → Projects
+   tab → your project → Add the key → grant project-level access.
+5. **Add your IP to the API access list** for the key (Access Manager →
+   API Keys → click your key → API Access List).
+6. Paste into `backend/.env`:
+
+   ```env
+   ATLAS_API_PUBLIC_KEY=abcdwxyz
+   ATLAS_API_PRIVATE_KEY=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+   ATLAS_PROJECT_ID=5e3f1a2b9c4d3e1f0a1b2c3d
+   ```
+
+7. Restart uvicorn. Test:
+
+   ```bash
+   curl http://localhost:8000/atlas/clusters
+   ```
+
+   Returns Atlas JSON with cluster list. 401 = bad keys. 403 = key lacks
+   project access. 404 = wrong project ID.
+
+> **Security:** the API private key has cluster-management power. Treat it
+> like a root password. Never commit. Rotate periodically.
 
 ---
 
@@ -209,15 +297,18 @@ synapse/
 │   ├── main.py              # FastAPI app, lifespan, static mount
 │   ├── routes/
 │   │   ├── chat.py          # /chat, /quiz/generate, /quiz/submit
-│   │   └── sessions.py      # /sessions/{id} GET + DELETE
+│   │   ├── sessions.py      # /sessions/{id} GET + DELETE
+│   │   └── atlas.py         # /atlas/* — Atlas Admin API v2 pass-through
 │   ├── services/
 │   │   ├── ai.py            # OpenAI client + error mapping
-│   │   └── quiz.py          # Quiz persistence + grading
+│   │   ├── quiz.py          # Quiz persistence + grading
+│   │   └── atlas.py         # httpx + Digest auth Atlas Admin client
 │   ├── db/
-│   │   └── mongo.py         # Motor async client + lifecycle
+│   │   └── mongo.py         # Motor async client (local or Atlas SRV)
 │   ├── models/
 │   │   └── schemas.py       # Pydantic v2 request/response models
-│   └── .env                 # secrets (gitignored)
+│   ├── .env.example         # template (tracked in git)
+│   └── .env                 # real secrets (gitignored)
 ├── frontend/
 │   ├── index.html           # Two-tab single page UI
 │   ├── style.css            # Dark theme
