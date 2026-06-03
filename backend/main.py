@@ -20,12 +20,26 @@ from backend.services.atlas import close_atlas_client  # noqa: E402
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    await connect_to_mongo()
+    # Startup is best-effort: under serverless (Vercel), a raised exception
+    # here aborts the whole app with "Application startup failed. Exiting."
+    # — which 500s every endpoint, even /healthz. Mongo connection is now
+    # lazy (see backend/db/mongo.py), so this is just a defensive guard
+    # against any future startup side-effect.
+    try:
+        await connect_to_mongo()
+    except Exception as exc:
+        print(f"[lifespan startup] connect_to_mongo failed (non-fatal): {exc}")
     try:
         yield
     finally:
-        await close_mongo_connection()
-        await close_atlas_client()
+        try:
+            await close_mongo_connection()
+        except Exception as exc:
+            print(f"[lifespan shutdown] close_mongo_connection failed: {exc}")
+        try:
+            await close_atlas_client()
+        except Exception as exc:
+            print(f"[lifespan shutdown] close_atlas_client failed: {exc}")
 
 
 app = FastAPI(
